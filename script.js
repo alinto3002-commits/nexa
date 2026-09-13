@@ -1,11 +1,15 @@
 /* ==========================================================================
    NEXA – THE DIGITAL GUARDIAN
-   Women Safety Emergency SOS & Cyber Crime Device Diagnostics Engine
-   Voice Speech Assistance: "I am coming, don't worry."
+   2-Way Interactive Voice Engine & Cyber Crime Diagnostics System
    ========================================================================== */
 
+let voiceEnabled = true;
+let isListening = false;
+let recognition = null;
+
 document.addEventListener('DOMContentLoaded', () => {
-  initVoice();
+  initVoiceEngine();
+  initRadioControls();
   initWomenSafetySOS();
   initCyberQuiz();
   initNexaChat();
@@ -13,30 +17,68 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /* --------------------------------------------------------------------------
-   01. Native Web Speech Synthesis Engine ("I am coming, don't worry.")
+   01. 2-Way Voice Engine (Text-to-Speech & Speech Recognition)
    -------------------------------------------------------------------------- */
-function initVoice() {
+function initVoiceEngine() {
   if ('speechSynthesis' in window) {
-    // Warm up voices load event
     window.speechSynthesis.getVoices();
     window.speechSynthesis.onvoiceschanged = () => {
       window.speechSynthesis.getVoices();
     };
   }
+
+  // Initialize Web Speech Recognition
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (SpeechRecognition) {
+    recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onstart = () => {
+      isListening = true;
+      updateMicUI(true);
+    };
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      const chatInput = document.getElementById('chat-input');
+      if (chatInput) {
+        chatInput.value = transcript;
+        chatInput.focus();
+      }
+    };
+
+    recognition.onerror = (event) => {
+      console.warn('Speech Recognition error:', event.error);
+      isListening = false;
+      updateMicUI(false);
+    };
+
+    recognition.onend = () => {
+      isListening = false;
+      updateMicUI(false);
+    };
+  }
 }
 
-function speakVoice(text = "I am coming, don't worry.") {
-  if (!('speechSynthesis' in window)) return;
+// 🔊 NEXA Speaks Message (Text-to-Speech)
+function speakNexa(rawText) {
+  if (!voiceEnabled || !('speechSynthesis' in window)) return;
 
   try {
-    window.speechSynthesis.cancel(); // Clear any queued speech
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 0.95;
-    utterance.pitch = 1.0;
+    window.speechSynthesis.cancel(); // Cancel ongoing speech
+
+    // Strip HTML tags for clean spoken output
+    const cleanText = rawText.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim();
+    if (!cleanText) return;
+
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.rate = 0.85; // Calm guardian speed
+    utterance.pitch = 0.9; // Deep calm pitch
     utterance.volume = 1.0;
 
     const voices = window.speechSynthesis.getVoices();
-    // Prefer clear English hero voice if available
     const preferredVoice = voices.find(v => 
       v.lang.startsWith('en') && 
       (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('David') || v.name.includes('Male') || v.name.includes('Alex'))
@@ -46,14 +88,120 @@ function speakVoice(text = "I am coming, don't worry.") {
       utterance.voice = preferredVoice;
     }
 
+    const eq = document.getElementById('voice-equalizer');
+    const eqLabel = document.getElementById('eq-status-label');
+
+    utterance.onstart = () => {
+      eq?.classList.add('speaking');
+      if (eqLabel) eqLabel.textContent = 'NEXA Speaking...';
+    };
+
+    utterance.onend = () => {
+      eq?.classList.remove('speaking');
+      if (eqLabel) eqLabel.textContent = 'Voice Ready';
+    };
+
+    utterance.onerror = () => {
+      eq?.classList.remove('speaking');
+      if (eqLabel) eqLabel.textContent = 'Voice Ready';
+    };
+
     window.speechSynthesis.speak(utterance);
   } catch (e) {
     console.warn('Speech synthesis error:', e);
   }
 }
 
+// Direct voice trigger for SOS ("I am coming, don't worry.")
+function speakVoice(text = "I am coming, don't worry.") {
+  if (!('speechSynthesis' in window)) return;
+  try {
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.9;
+    utterance.pitch = 0.95;
+    utterance.volume = 1.0;
+    window.speechSynthesis.speak(utterance);
+  } catch (e) {}
+}
+
+// 🎤 Start / Toggle Listening (Speech-to-Text)
+function toggleVoiceInput() {
+  if (!recognition) {
+    alert('Speech recognition is not supported in your current browser. Please try Chrome, Edge, or Safari.');
+    return;
+  }
+
+  if (isListening) {
+    recognition.stop();
+  } else {
+    try {
+      recognition.start();
+    } catch (e) {
+      console.warn('Speech recognition start error:', e);
+    }
+  }
+}
+
+function updateMicUI(listening) {
+  const micBtn = document.getElementById('chat-mic-btn');
+  const micIcon = document.getElementById('mic-btn-icon');
+  const eqLabel = document.getElementById('eq-status-label');
+
+  if (listening) {
+    micBtn?.classList.add('mic-active');
+    if (micIcon) micIcon.textContent = '🔴 Listening...';
+    if (eqLabel) eqLabel.textContent = 'Listening to Visitor...';
+  } else {
+    micBtn?.classList.remove('mic-active');
+    if (micIcon) micIcon.textContent = '🎤';
+    if (eqLabel) eqLabel.textContent = 'Voice Ready';
+  }
+}
+
 /* --------------------------------------------------------------------------
-   02. Women Safety Emergency SOS Handler
+   02. Vintage Voice Radio Controls
+   -------------------------------------------------------------------------- */
+function initRadioControls() {
+  const globalToggle = document.getElementById('global-voice-toggle-btn');
+  const radioToggle = document.getElementById('radio-voice-toggle-btn');
+  const radioToggleLabel = document.getElementById('radio-toggle-label');
+  const hearBtn = document.getElementById('radio-hear-nexa-btn');
+  const speakBtn = document.getElementById('radio-speak-mic-btn');
+  const micInputBtn = document.getElementById('chat-mic-btn');
+
+  const updateVoiceUIState = () => {
+    const text = voiceEnabled ? '🔊 VOICE: ON' : '🔇 VOICE: MUTED';
+    if (globalToggle) globalToggle.textContent = text;
+    if (radioToggleLabel) radioToggleLabel.textContent = text;
+  };
+
+  const toggleVoice = () => {
+    voiceEnabled = !voiceEnabled;
+    if (!voiceEnabled && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    updateVoiceUIState();
+  };
+
+  globalToggle?.addEventListener('click', toggleVoice);
+  radioToggle?.addEventListener('click', toggleVoice);
+
+  hearBtn?.addEventListener('click', () => {
+    speakNexa("Hello traveler. I am NEXA, your Guardian. I am listening and ready to help you stay safe.");
+  });
+
+  speakBtn?.addEventListener('click', () => {
+    toggleVoiceInput();
+  });
+
+  micInputBtn?.addEventListener('click', () => {
+    toggleVoiceInput();
+  });
+}
+
+/* --------------------------------------------------------------------------
+   03. Women Safety Emergency SOS Handler
    -------------------------------------------------------------------------- */
 function initWomenSafetySOS() {
   const navBtn = document.getElementById('nav-women-sos-btn');
@@ -65,13 +213,9 @@ function initWomenSafetySOS() {
   const ackBtn = document.getElementById('superman-ack-btn');
 
   const triggerSOS = () => {
-    // 1. Speak Voice "I am coming, don't worry."
     speakVoice("I am coming, don't worry.");
-
-    // 2. Open Superman Pop-up Modal
     supermanModal.classList.add('active');
 
-    // 3. Send Live Emergency SOS Email to alinto3002@gmail.com
     fetch('/api/women-safety-alert', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -101,7 +245,7 @@ function initWomenSafetySOS() {
 }
 
 /* --------------------------------------------------------------------------
-   03. Digital Cyber Safety Quiz
+   04. Digital Cyber Safety Quiz
    -------------------------------------------------------------------------- */
 function initCyberQuiz() {
   const answers = { 0: null, 1: null, 2: null, 3: null, 4: null };
@@ -181,7 +325,7 @@ function initCyberQuiz() {
 }
 
 /* --------------------------------------------------------------------------
-   04. NEXA Chatbot Interactive Engine (Cyber Diagnostics & Email Dispatch)
+   05. NEXA Chatbot Interactive Engine (Cyber Diagnostics & Voice Integration)
    -------------------------------------------------------------------------- */
 function initNexaChat() {
   const messagesContainer = document.getElementById('chat-messages');
@@ -248,6 +392,9 @@ function initNexaChat() {
       `;
       messagesContainer.appendChild(msgDiv);
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+      // Auto-speak NEXA message via Web Speech API
+      speakNexa(htmlContent);
     }, delay);
   }
 
@@ -353,7 +500,7 @@ function initNexaChat() {
         🔍 <strong>CYBER CRIME DEVICE DIAGNOSTICS INITIATED</strong><br><br>
         Let's determine if your device or accounts are trapped in a cyber crime.<br><br>
         <strong>DIAGNOSTIC QUESTION 1:</strong><br>
-        Is your phone/computer behaving strangely, heating up, running unknown apps, or acting on its own?
+        Is your phone or computer behaving strangely, heating up, running unknown apps, or acting on its own?
       `);
       showDiagQ1();
     } else {
@@ -451,7 +598,6 @@ function initNexaChat() {
   }
 
   function triggerProcessing() {
-    // 1. Speak Voice "I am coming, don't worry."
     speakVoice("I am coming, don't worry.");
 
     const procDiv = document.createElement('div');
@@ -468,7 +614,6 @@ function initNexaChat() {
     messagesContainer.appendChild(procDiv);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
-    // Call API backend to send live email
     fetch('/api/cyber-crime-alert', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -522,13 +667,15 @@ function initNexaChat() {
     document.getElementById('re-talk-btn')?.addEventListener('click', () => {
       resetChat();
     });
+
+    speakNexa(`Report dispatched, ${visitorState.name}. Your cyber crime diagnostic report has been sent to our superhero inbox.`);
   }
 
   startOnboarding();
 }
 
 /* --------------------------------------------------------------------------
-   05. Email Payload Modal Simulator
+   06. Email Payload Modal Simulator
    -------------------------------------------------------------------------- */
 function initModal() {
   const modal = document.getElementById('email-modal');
@@ -589,7 +736,8 @@ function escapeHtml(str) {
   return str.replace(/[&<>"']/g, function(m) {
     return {
       '&': '&amp;',
-      '<': '&lt;'>',
+      '<': '&lt;',
+      '>': '&gt;',
       '"': '&quot;',
       "'": '&#039;'
     }[m];
