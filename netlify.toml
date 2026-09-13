@@ -1,4 +1,5 @@
 [build]
+  command = ""
   publish = "."
   functions = "netlify/functions"
 
@@ -10,9 +11,4 @@
 [[redirects]]
   from = "/api/cyber-crime-alert"
   to = "/.netlify/functions/cyber-crime-alert"
-  status = 200
-
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
   status = 200

@@ -6,7 +6,7 @@
   "type": "commonjs",
   "scripts": {
     "start": "node server.js",
-    "build": "echo 'Netlify build ready'",
+    "build": "echo 'Static site ready for Netlify'",
     "deploy": "npx netlify deploy --prod"
   },
   "dependencies": {
@@ -16,6 +16,6 @@
     "nodemailer": "^6.9.13"
   },
   "devDependencies": {
-    "netlify-cli": "^27.5.2"
+    "netlify-cli": "^17.38.1"
   }
 }
