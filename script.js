@@ -1,12 +1,13 @@
 /* ==========================================================================
    NEXA – THE DIGITAL GUARDIAN
-   2-Way Interactive Voice Engine & Cyber Crime Diagnostics System
-   Supports Custom Voice Audio File (assets/nexa_voice.mp3)
+   Voice Audio Manager: Zero Overlap, ElevenLabs Pre-Mail Dispatch Voice,
+   and On-Demand Chatbot Voice Speech.
    ========================================================================== */
 
 let voiceEnabled = true;
 let isListening = false;
 let recognition = null;
+let currentAudioFile = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   initVoiceEngine();
@@ -18,82 +19,81 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /* --------------------------------------------------------------------------
-   01. Custom Voice Audio & Web Speech Synthesis Engine
+   01. Audio Stop & Zero-Overlap Manager
    -------------------------------------------------------------------------- */
-function initVoiceEngine() {
+
+/**
+ * Instantly stops all playing HTML5 audio files and SpeechSynthesis to prevent any audio overlap.
+ */
+function stopAllAudioAndSpeech() {
   if ('speechSynthesis' in window) {
-    window.speechSynthesis.getVoices();
-    window.speechSynthesis.onvoiceschanged = () => {
-      window.speechSynthesis.getVoices();
-    };
+    window.speechSynthesis.cancel();
   }
-
-  // Initialize Web Speech Recognition
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (SpeechRecognition) {
-    recognition = new SpeechRecognition();
-    recognition.lang = 'en-US';
-    recognition.continuous = false;
-    recognition.interimResults = false;
-
-    recognition.onstart = () => {
-      isListening = true;
-      updateMicUI(true);
-    };
-
-    recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
-      const chatInput = document.getElementById('chat-input');
-      if (chatInput) {
-        chatInput.value = transcript;
-        chatInput.focus();
-      }
-    };
-
-    recognition.onerror = (event) => {
-      console.warn('Speech Recognition error:', event.error);
-      isListening = false;
-      updateMicUI(false);
-    };
-
-    recognition.onend = () => {
-      isListening = false;
-      updateMicUI(false);
-    };
+  if (currentAudioFile) {
+    try {
+      currentAudioFile.pause();
+      currentAudioFile.currentTime = 0;
+    } catch (e) {}
+    currentAudioFile = null;
   }
+  const eq = document.getElementById('voice-equalizer');
+  const eqLabel = document.getElementById('eq-status-label');
+  eq?.classList.remove('speaking');
+  if (eqLabel) eqLabel.textContent = 'Voice Ready';
 }
 
 /**
-  * Play Custom Voice File (assets/nexa_voice.mp3) with automatic Web Speech fallback
-  */
-function playCustomVoiceAudio(fallbackText = "I am coming, don't worry.") {
+ * Play ElevenLabs voice audio file (assets/nexa_voice.mp3) before email is sent.
+ * Guarantees zero audio overlap.
+ */
+function playElevenLabsVoiceBeforeMail(fallbackText = "I am coming, don't worry.") {
+  stopAllAudioAndSpeech();
+
   if (!voiceEnabled) return;
 
-  const customAudio = new Audio('assets/nexa_voice.mp3');
-  customAudio.play()
+  currentAudioFile = new Audio('assets/nexa_voice.mp3');
+
+  const eq = document.getElementById('voice-equalizer');
+  const eqLabel = document.getElementById('eq-status-label');
+
+  currentAudioFile.addEventListener('play', () => {
+    eq?.classList.add('speaking');
+    if (eqLabel) eqLabel.textContent = 'ElevenLabs Hero Voice Active...';
+  });
+
+  currentAudioFile.addEventListener('ended', () => {
+    eq?.classList.remove('speaking');
+    if (eqLabel) eqLabel.textContent = 'Voice Ready';
+    currentAudioFile = null;
+  });
+
+  currentAudioFile.play()
     .then(() => {
-      console.log('✅ Playing custom voice audio recording (assets/nexa_voice.mp3)');
+      console.log('✅ Playing ElevenLabs voice (assets/nexa_voice.mp3) before mail sent');
     })
     .catch((err) => {
-      // If assets/nexa_voice.mp3 is not added yet, fall back to browser text-to-speech
+      console.warn('Fallback to text-to-speech:', err);
       speakVoice(fallbackText);
     });
 }
 
-// 🔊 NEXA Speaks Message (Text-to-Speech)
-function speakNexa(rawText) {
+/**
+ * Speaks text out loud ONLY when explicitly requested by user in chat / radio.
+ * Guarantees zero audio overlap.
+ */
+function speakNexaOnDemand(rawText) {
   if (!voiceEnabled || !('speechSynthesis' in window)) return;
 
-  try {
-    window.speechSynthesis.cancel(); // Cancel ongoing speech
+  stopAllAudioAndSpeech();
 
-    // Strip HTML tags for clean spoken output
+  try {
+    // Strip HTML tags for clean speech output
     const cleanText = rawText.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim();
     if (!cleanText) return;
 
     const utterance = new SpeechSynthesisUtterance(cleanText);
     utterance.rate = 0.85; // Calm guardian speed
-    utterance.pitch = 0.9; // Deep calm pitch
+    utterance.pitch = 0.9;  // Deep calm pitch
     utterance.volume = 1.0;
 
     const voices = window.speechSynthesis.getVoices();
@@ -130,11 +130,11 @@ function speakNexa(rawText) {
   }
 }
 
-// Spoken voice trigger for Women Safety SOS
+// Spoken voice fallback helper
 function speakVoice(text = "I am coming, don't worry.") {
+  stopAllAudioAndSpeech();
   if (!('speechSynthesis' in window)) return;
   try {
-    window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.rate = 0.9;
     utterance.pitch = 0.95;
@@ -143,8 +143,54 @@ function speakVoice(text = "I am coming, don't worry.") {
   } catch (e) {}
 }
 
-// 🎤 Start / Toggle Listening (Speech-to-Text)
+/* --------------------------------------------------------------------------
+   02. Speech-to-Text Initialization & Mic Controls
+   -------------------------------------------------------------------------- */
+function initVoiceEngine() {
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.getVoices();
+    window.speechSynthesis.onvoiceschanged = () => {
+      window.speechSynthesis.getVoices();
+    };
+  }
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (SpeechRecognition) {
+    recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onstart = () => {
+      isListening = true;
+      updateMicUI(true);
+    };
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      const chatInput = document.getElementById('chat-input');
+      if (chatInput) {
+        chatInput.value = transcript;
+        chatInput.focus();
+      }
+    };
+
+    recognition.onerror = (event) => {
+      console.warn('Speech Recognition error:', event.error);
+      isListening = false;
+      updateMicUI(false);
+    };
+
+    recognition.onend = () => {
+      isListening = false;
+      updateMicUI(false);
+    };
+  }
+}
+
 function toggleVoiceInput() {
+  stopAllAudioAndSpeech();
+
   if (!recognition) {
     alert('Speech recognition is not supported in your current browser. Please try Chrome, Edge, or Safari.');
     return;
@@ -178,7 +224,7 @@ function updateMicUI(listening) {
 }
 
 /* --------------------------------------------------------------------------
-   02. Vintage Voice Radio Controls
+   03. Vintage Voice Radio Controls
    -------------------------------------------------------------------------- */
 function initRadioControls() {
   const globalToggle = document.getElementById('global-voice-toggle-btn');
@@ -196,8 +242,8 @@ function initRadioControls() {
 
   const toggleVoice = () => {
     voiceEnabled = !voiceEnabled;
-    if (!voiceEnabled && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
+    if (!voiceEnabled) {
+      stopAllAudioAndSpeech();
     }
     updateVoiceUIState();
   };
@@ -206,7 +252,8 @@ function initRadioControls() {
   radioToggle?.addEventListener('click', toggleVoice);
 
   hearBtn?.addEventListener('click', () => {
-    playCustomVoiceAudio("Hello traveler. I am NEXA, your Guardian. I am listening and ready to help you stay safe.");
+    // On explicit button click, play ElevenLabs voice or speak on demand
+    playElevenLabsVoiceBeforeMail("Hello traveler. I am NEXA, your Guardian. I am listening and ready to help you stay safe.");
   });
 
   speakBtn?.addEventListener('click', () => {
@@ -219,7 +266,7 @@ function initRadioControls() {
 }
 
 /* --------------------------------------------------------------------------
-   03. Women Safety Emergency SOS Handler
+   04. Women Safety Emergency SOS Handler
    -------------------------------------------------------------------------- */
 function initWomenSafetySOS() {
   const navBtn = document.getElementById('nav-women-sos-btn');
@@ -231,8 +278,8 @@ function initWomenSafetySOS() {
   const ackBtn = document.getElementById('superman-ack-btn');
 
   const triggerSOS = () => {
-    // 1. Play Custom Voice Audio (assets/nexa_voice.mp3) or speak fallback
-    playCustomVoiceAudio("I am coming, don't worry.");
+    // 1. Play ElevenLabs Custom Voice before mail sent (zero overlap)
+    playElevenLabsVoiceBeforeMail("I am coming, don't worry.");
 
     // 2. Open Superman Modal
     supermanModal.classList.add('active');
@@ -262,12 +309,19 @@ function initWomenSafetySOS() {
   heroBtn?.addEventListener('click', triggerSOS);
   sectionBtn?.addEventListener('click', triggerSOS);
 
-  closeBtn?.addEventListener('click', () => supermanModal.classList.remove('active'));
-  ackBtn?.addEventListener('click', () => supermanModal.classList.remove('active'));
+  closeBtn?.addEventListener('click', () => {
+    stopAllAudioAndSpeech();
+    supermanModal.classList.remove('active');
+  });
+  
+  ackBtn?.addEventListener('click', () => {
+    stopAllAudioAndSpeech();
+    supermanModal.classList.remove('active');
+  });
 }
 
 /* --------------------------------------------------------------------------
-   04. Digital Cyber Safety Quiz
+   05. Digital Cyber Safety Quiz
    -------------------------------------------------------------------------- */
 function initCyberQuiz() {
   const answers = { 0: null, 1: null, 2: null, 3: null, 4: null };
@@ -347,7 +401,7 @@ function initCyberQuiz() {
 }
 
 /* --------------------------------------------------------------------------
-   05. NEXA Chatbot Interactive Engine (Cyber Diagnostics & Voice Integration)
+   06. NEXA Chatbot Interactive Engine (Cyber Diagnostics & On-Demand Voice)
    -------------------------------------------------------------------------- */
 function initNexaChat() {
   const messagesContainer = document.getElementById('chat-messages');
@@ -385,6 +439,7 @@ function initNexaChat() {
   });
 
   function resetChat() {
+    stopAllAudioAndSpeech();
     visitorState = {
       step: 'NAME',
       name: '',
@@ -404,19 +459,34 @@ function initNexaChat() {
     startOnboarding();
   }
 
-  function appendNexaMsg(htmlContent, delay = 250) {
+  function appendNexaMsg(htmlContent, delay = 200) {
     setTimeout(() => {
       const msgDiv = document.createElement('div');
       msgDiv.className = 'msg msg-nexa';
-      msgDiv.innerHTML = `
-        <div class="chat-avatar"><img src="assets/nexa_vintage_hero.jpg" alt="NEXA"></div>
-        <div class="msg-bubble">${htmlContent}</div>
+      
+      // Create message element with an on-demand 🔊 Listen button
+      const bubbleDiv = document.createElement('div');
+      bubbleDiv.className = 'msg-bubble';
+      bubbleDiv.innerHTML = `
+        ${htmlContent}
+        <div style="margin-top: 0.5rem; text-align: right;">
+          <button class="listen-msg-btn" style="background: transparent; border: 1px solid var(--sepia-border-dark); border-radius: 4px; padding: 0.2rem 0.6rem; font-size: 0.75rem; color: var(--navy-ink); cursor: pointer;">
+            🔊 Listen
+          </button>
+        </div>
       `;
+
+      msgDiv.appendChild(document.createElement('div')).className = 'chat-avatar';
+      msgDiv.querySelector('.chat-avatar').innerHTML = `<img src="assets/nexa_vintage_hero.jpg" alt="NEXA">`;
+      msgDiv.appendChild(bubbleDiv);
+
+      // Attach Listen button listener (plays voice ONLY on user request)
+      bubbleDiv.querySelector('.listen-msg-btn')?.addEventListener('click', () => {
+        speakNexaOnDemand(htmlContent);
+      });
+
       messagesContainer.appendChild(msgDiv);
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
-
-      // Auto-speak NEXA message via Web Speech API
-      speakNexa(htmlContent);
     }, delay);
   }
 
@@ -514,7 +584,8 @@ function initNexaChat() {
     appendUserMsg(cat.label);
 
     if (cat.id === 'WOMEN_SAFETY') {
-      playCustomVoiceAudio("I am coming, don't worry.");
+      // Play ElevenLabs custom hero voice before mail sent
+      playElevenLabsVoiceBeforeMail("I am coming, don't worry.");
       document.getElementById('superman-modal').classList.add('active');
       appendNexaMsg(`🚨 <strong>SUPERHERO SOS ACTIVATED!</strong><br>An urgent Women Safety alert email has been sent to alinto3002@gmail.com.`);
     } else if (cat.id === 'CYBER_DIAGNOSTICS') {
@@ -620,7 +691,8 @@ function initNexaChat() {
   }
 
   function triggerProcessing() {
-    playCustomVoiceAudio("I am coming, don't worry.");
+    // Play ElevenLabs custom voice before email is sent
+    playElevenLabsVoiceBeforeMail("I am coming, don't worry.");
 
     const procDiv = document.createElement('div');
     procDiv.className = 'msg msg-nexa';
@@ -689,15 +761,13 @@ function initNexaChat() {
     document.getElementById('re-talk-btn')?.addEventListener('click', () => {
       resetChat();
     });
-
-    speakNexa(`Report dispatched, ${visitorState.name}. Your cyber crime diagnostic report has been sent to our superhero inbox.`);
   }
 
   startOnboarding();
 }
 
 /* --------------------------------------------------------------------------
-   06. Email Payload Modal Simulator
+   07. Email Payload Modal Simulator
    -------------------------------------------------------------------------- */
 function initModal() {
   const modal = document.getElementById('email-modal');
