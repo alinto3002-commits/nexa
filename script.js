@@ -1,6 +1,7 @@
 /* ==========================================================================
    NEXA – THE DIGITAL GUARDIAN
    2-Way Interactive Voice Engine & Cyber Crime Diagnostics System
+   Supports Custom Voice Audio File (assets/nexa_voice.mp3)
    ========================================================================== */
 
 let voiceEnabled = true;
@@ -17,7 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /* --------------------------------------------------------------------------
-   01. 2-Way Voice Engine (Text-to-Speech & Speech Recognition)
+   01. Custom Voice Audio & Web Speech Synthesis Engine
    -------------------------------------------------------------------------- */
 function initVoiceEngine() {
   if ('speechSynthesis' in window) {
@@ -60,6 +61,23 @@ function initVoiceEngine() {
       updateMicUI(false);
     };
   }
+}
+
+/**
+  * Play Custom Voice File (assets/nexa_voice.mp3) with automatic Web Speech fallback
+  */
+function playCustomVoiceAudio(fallbackText = "I am coming, don't worry.") {
+  if (!voiceEnabled) return;
+
+  const customAudio = new Audio('assets/nexa_voice.mp3');
+  customAudio.play()
+    .then(() => {
+      console.log('✅ Playing custom voice audio recording (assets/nexa_voice.mp3)');
+    })
+    .catch((err) => {
+      // If assets/nexa_voice.mp3 is not added yet, fall back to browser text-to-speech
+      speakVoice(fallbackText);
+    });
 }
 
 // 🔊 NEXA Speaks Message (Text-to-Speech)
@@ -112,7 +130,7 @@ function speakNexa(rawText) {
   }
 }
 
-// Direct voice trigger for SOS ("I am coming, don't worry.")
+// Spoken voice trigger for Women Safety SOS
 function speakVoice(text = "I am coming, don't worry.") {
   if (!('speechSynthesis' in window)) return;
   try {
@@ -188,7 +206,7 @@ function initRadioControls() {
   radioToggle?.addEventListener('click', toggleVoice);
 
   hearBtn?.addEventListener('click', () => {
-    speakNexa("Hello traveler. I am NEXA, your Guardian. I am listening and ready to help you stay safe.");
+    playCustomVoiceAudio("Hello traveler. I am NEXA, your Guardian. I am listening and ready to help you stay safe.");
   });
 
   speakBtn?.addEventListener('click', () => {
@@ -213,9 +231,13 @@ function initWomenSafetySOS() {
   const ackBtn = document.getElementById('superman-ack-btn');
 
   const triggerSOS = () => {
-    speakVoice("I am coming, don't worry.");
+    // 1. Play Custom Voice Audio (assets/nexa_voice.mp3) or speak fallback
+    playCustomVoiceAudio("I am coming, don't worry.");
+
+    // 2. Open Superman Modal
     supermanModal.classList.add('active');
 
+    // 3. Dispatch Live Email to alinto3002@gmail.com
     fetch('/api/women-safety-alert', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -492,7 +514,7 @@ function initNexaChat() {
     appendUserMsg(cat.label);
 
     if (cat.id === 'WOMEN_SAFETY') {
-      speakVoice("I am coming, don't worry.");
+      playCustomVoiceAudio("I am coming, don't worry.");
       document.getElementById('superman-modal').classList.add('active');
       appendNexaMsg(`🚨 <strong>SUPERHERO SOS ACTIVATED!</strong><br>An urgent Women Safety alert email has been sent to alinto3002@gmail.com.`);
     } else if (cat.id === 'CYBER_DIAGNOSTICS') {
@@ -598,7 +620,7 @@ function initNexaChat() {
   }
 
   function triggerProcessing() {
-    speakVoice("I am coming, don't worry.");
+    playCustomVoiceAudio("I am coming, don't worry.");
 
     const procDiv = document.createElement('div');
     procDiv.className = 'msg msg-nexa';
@@ -737,7 +759,6 @@ function escapeHtml(str) {
     return {
       '&': '&amp;',
       '<': '&lt;',
-      '>': '&gt;',
       '"': '&quot;',
       "'": '&#039;'
     }[m];
