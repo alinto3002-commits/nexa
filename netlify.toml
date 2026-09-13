@@ -1,0 +1,18 @@
+[build]
+  publish = "."
+  functions = "netlify/functions"
+
+[[redirects]]
+  from = "/api/women-safety-alert"
+  to = "/.netlify/functions/women-safety-alert"
+  status = 200
+
+[[redirects]]
+  from = "/api/cyber-crime-alert"
+  to = "/.netlify/functions/cyber-crime-alert"
+  status = 200
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
