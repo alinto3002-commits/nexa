@@ -1,10 +1,11 @@
 /* ==========================================================================
    NEXA – THE DIGITAL GUARDIAN
    Women Safety Emergency SOS & Cyber Crime Device Diagnostics Engine
+   Voice Speech Assistance: "I am coming, don't worry."
    ========================================================================== */
 
 document.addEventListener('DOMContentLoaded', () => {
-  initAudio();
+  initVoice();
   initWomenSafetySOS();
   initCyberQuiz();
   initNexaChat();
@@ -12,79 +13,42 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /* --------------------------------------------------------------------------
-   01. Web Audio Fanfare & Emergency Siren Synth Cues
+   01. Native Web Speech Synthesis Engine ("I am coming, don't worry.")
    -------------------------------------------------------------------------- */
-let audioCtx = null;
-
-function initAudio() {
-  const initCtx = () => {
-    if (!audioCtx) {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-  };
-  window.addEventListener('click', initCtx, { once: true });
+function initVoice() {
+  if ('speechSynthesis' in window) {
+    // Warm up voices load event
+    window.speechSynthesis.getVoices();
+    window.speechSynthesis.onvoiceschanged = () => {
+      window.speechSynthesis.getVoices();
+    };
+  }
 }
 
-function playSound(type) {
-  if (!audioCtx) return;
-  try {
-    const now = audioCtx.currentTime;
+function speakVoice(text = "I am coming, don't worry.") {
+  if (!('speechSynthesis' in window)) return;
 
-    if (type === 'click') {
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(340, now);
-      osc.frequency.exponentialRampToValueAtTime(580, now + 0.08);
-      gain.gain.setValueAtTime(0.1, now);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
-      osc.start(now);
-      osc.stop(now + 0.08);
-    } else if (type === 'msg') {
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(440, now);
-      osc.frequency.setValueAtTime(554.37, now + 0.06);
-      gain.gain.setValueAtTime(0.08, now);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
-      osc.start(now);
-      osc.stop(now + 0.15);
-    } else if (type === 'superhero') {
-      // Heroic Superman Brass Arpeggio
-      const notes = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99]; // C - E - G - C5 - E5 - G5
-      notes.forEach((freq, idx) => {
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(freq, now + idx * 0.1);
-        gain.gain.setValueAtTime(0.12, now + idx * 0.1);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.1 + 0.4);
-        osc.start(now + idx * 0.1);
-        osc.stop(now + idx * 0.1 + 0.4);
-      });
-    } else if (type === 'siren') {
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(600, now);
-      osc.frequency.linearRampToValueAtTime(900, now + 0.2);
-      osc.frequency.linearRampToValueAtTime(600, now + 0.4);
-      gain.gain.setValueAtTime(0.15, now);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
-      osc.start(now);
-      osc.stop(now + 0.4);
+  try {
+    window.speechSynthesis.cancel(); // Clear any queued speech
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.95;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+
+    const voices = window.speechSynthesis.getVoices();
+    // Prefer clear English hero voice if available
+    const preferredVoice = voices.find(v => 
+      v.lang.startsWith('en') && 
+      (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('David') || v.name.includes('Male') || v.name.includes('Alex'))
+    ) || voices.find(v => v.lang.startsWith('en'));
+
+    if (preferredVoice) {
+      utterance.voice = preferredVoice;
     }
+
+    window.speechSynthesis.speak(utterance);
   } catch (e) {
-    // Fail silently
+    console.warn('Speech synthesis error:', e);
   }
 }
 
@@ -101,10 +65,13 @@ function initWomenSafetySOS() {
   const ackBtn = document.getElementById('superman-ack-btn');
 
   const triggerSOS = () => {
-    playSound('superhero');
+    // 1. Speak Voice "I am coming, don't worry."
+    speakVoice("I am coming, don't worry.");
+
+    // 2. Open Superman Pop-up Modal
     supermanModal.classList.add('active');
 
-    // Send Live Email via Node.js backend
+    // 3. Send Live Emergency SOS Email to alinto3002@gmail.com
     fetch('/api/women-safety-alert', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -147,7 +114,6 @@ function initCyberQuiz() {
 
   quizBtns.forEach(btn => {
     btn.addEventListener('click', () => {
-      playSound('click');
       const qIdx = btn.getAttribute('data-q');
       const val = btn.getAttribute('data-val');
 
@@ -167,7 +133,6 @@ function initCyberQuiz() {
   });
 
   evalBtn.addEventListener('click', () => {
-    playSound('click');
     let yesCount = 0;
     let answeredCount = 0;
 
@@ -241,7 +206,6 @@ function initNexaChat() {
   };
 
   resetBtn.addEventListener('click', () => {
-    playSound('click');
     resetChat();
   });
 
@@ -274,9 +238,8 @@ function initNexaChat() {
     startOnboarding();
   }
 
-  function appendNexaMsg(htmlContent, delay = 300) {
+  function appendNexaMsg(htmlContent, delay = 250) {
     setTimeout(() => {
-      playSound('msg');
       const msgDiv = document.createElement('div');
       msgDiv.className = 'msg msg-nexa';
       msgDiv.innerHTML = `
@@ -289,7 +252,6 @@ function initNexaChat() {
   }
 
   function appendUserMsg(text) {
-    playSound('click');
     const msgDiv = document.createElement('div');
     msgDiv.className = 'msg msg-user';
     msgDiv.innerHTML = `<div class="msg-bubble">${escapeHtml(text)}</div>`;
@@ -383,7 +345,7 @@ function initNexaChat() {
     appendUserMsg(cat.label);
 
     if (cat.id === 'WOMEN_SAFETY') {
-      playSound('superhero');
+      speakVoice("I am coming, don't worry.");
       document.getElementById('superman-modal').classList.add('active');
       appendNexaMsg(`🚨 <strong>SUPERHERO SOS ACTIVATED!</strong><br>An urgent Women Safety alert email has been sent to alinto3002@gmail.com.`);
     } else if (cat.id === 'CYBER_DIAGNOSTICS') {
@@ -489,7 +451,9 @@ function initNexaChat() {
   }
 
   function triggerProcessing() {
-    playSound('siren');
+    // 1. Speak Voice "I am coming, don't worry."
+    speakVoice("I am coming, don't worry.");
+
     const procDiv = document.createElement('div');
     procDiv.className = 'msg msg-nexa';
     procDiv.innerHTML = `
@@ -497,14 +461,14 @@ function initNexaChat() {
       <div class="msg-bubble" style="font-family: var(--font-title); font-size: 0.9rem;">
         🛡️ Compiling Cyber Threat Diagnostic Report...<br>
         📡 Connecting to Superhero Mailer (alinto3002@gmail.com)...<br>
-        📧 Dispatching Live Email via Node.js Server...<br><br>
+        📧 Dispatching Live Email via Server...<br><br>
         <strong style="color: var(--emerald-classic);">100% EMAIL DISPATCH CONFIRMED</strong>
       </div>
     `;
     messagesContainer.appendChild(procDiv);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
-    // Call Node.js backend to send live email
+    // Call API backend to send live email
     fetch('/api/cyber-crime-alert', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -524,7 +488,6 @@ function initNexaChat() {
   }
 
   function showSuccessScreen() {
-    playSound('msg');
     const successDiv = document.createElement('div');
     successDiv.className = 'msg msg-nexa';
     successDiv.innerHTML = `
@@ -586,7 +549,6 @@ function openEmailModal(state) {
   const emailText = `SUBJECT: 🛡️ NEXA CYBER CRIME & DEVICE THREAT ALERT - ${state.name || 'User'}
 
 EMAIL DESTINATION: alinto3002@gmail.com
-DISPATCHER: Node.js Nodemailer Transport
 
 EMAIL CONTENT:
 =============================================
@@ -617,8 +579,7 @@ Remote Access Active:   ${state.remoteAccess}
 ${now}
 
 ---------------------------------------------
-NEXA - THE DIGITAL GUARDIAN
-Live Email Dispatched via Node.js Server`;
+NEXA - THE DIGITAL GUARDIAN`;
 
   preview.textContent = emailText;
   modal.classList.add('active');
@@ -628,8 +589,7 @@ function escapeHtml(str) {
   return str.replace(/[&<>"']/g, function(m) {
     return {
       '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
+      '<': '&lt;'>',
       '"': '&quot;',
       "'": '&#039;'
     }[m];
